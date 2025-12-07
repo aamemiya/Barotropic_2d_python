@@ -1,9 +1,10 @@
-from fluidsim.solvers.ns2d.solver import Simul
+import os 
 import numpy as np, math
 from netCDF4 import Dataset
+from fluidsim.solvers.ns2d.solver import Simul
 
 # --- open a NetCDF file to load the forcing ---
-path_nc_in = "/home/jwa-user/practice_pytorch/Barotropic/forcing_test.nc"
+path_nc_in = os.path.join(os.getcwd(),"forcings","forcing_x2.nc")
 nc = Dataset(path_nc_in, "r")
 
 vrot_in=nc["rot_forcing"]
@@ -16,7 +17,7 @@ nt=nc.dimensions['time'].size
 #print(nt)
 #quit()
 # --- open a NetCDF file to log the forcing ---
-path_nc_out = "/home/jwa-user/practice_pytorch/Barotropic/forcing_test_low.nc"
+path_nc_out = os.path.join(os.getcwd(),"forcings","forcing_x4.nc")
 nc = Dataset(path_nc_out, "w")
 nc.createDimension("time", None)
 nc.createDimension("y", ny//2)
@@ -34,7 +35,8 @@ def reduce(array_in):
     return np.vstack([top,bottom])
 
 for it in range(nt):
-    print(it)
+    if np.mod(it,100) == 0 :
+        print(it)
     vtime[it]=vtime_in[it]
     vrot[it,:,:]=vrot_in[it,::2,::2]
     forcing_rot_r_out[it,:,:]=reduce(forcing_rot_r_in[it,:,:])
