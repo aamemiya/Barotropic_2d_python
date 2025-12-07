@@ -6,6 +6,7 @@ import numpy as np
 import netCDF4
 import matplotlib
 import matplotlib.pyplot as plt
+from common import vor_norm, vor_levels, vor_colormap
 
 indir=sys.argv[1]
 files=sorted(glob.glob(indir + "/state_phys*.nc"))
@@ -34,7 +35,7 @@ for f in files[ista:iend:intv] :
     cs=plt.pcolormesh(x,y,vor, norm=vor_norm,cmap=vor_colormap)
 #    cs=plt.contourf(x,y,vor,levels=vor_levels,norm=vor_norm, cmap=vor_colormap,extend="both")
     cbar = plt.colorbar(cs,location='right')
-    fname="test_"+str(it).zfill(4)+".png"
+    fname="vor_"+str(it).zfill(4)+".png"
     print(fname)
     plt.savefig(fname)
     plt.clf()

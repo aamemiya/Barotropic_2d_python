@@ -1,53 +1,84 @@
+import os 
+import sys 
+import numpy as np
+import h5netcdf
 from fluidsim.solvers.ns2d.solver import Simul
-import numpy as np, math
-from netCDF4 import Dataset
+from fluidsim.base.output.base import SpecificOutput
+import common
+
+init_nc=sys.argv[1]
+
+nx=128
+dt0=0.004
+dt_out=0.4
+intv_out=int(round(dt_out/dt0))
+lead_time=10
+
+# Keep a reference to the original method
+_orig_has_to_online_save = SpecificOutput._has_to_online_save
+
+# Install the patch globally
+SpecificOutput._has_to_online_save = common._has_to_online_save_every_n_steps
 
 params = Simul.create_default_params()
-params.oper.nx = params.oper.ny = 256
+params.oper.nx = params.oper.ny = nx
 params.oper.Lx = params.oper.Ly = 2.0 * 3.141592653589793
-params.time_stepping.t_end = 10.0
-params.time_stepping.deltat0 = 0.002
+params.time_stepping.deltat0 = dt0
 params.time_stepping.USE_CFL = False
 
 params.forcing.enable = True
 params.forcing.type = "in_script"        # fixed pattern you supply
 params.forcing.key_forced = "rot_fft"    # force vorticity (standard in ns2d)
-params.nu_4 = 1e-8                   # hyperviscosity (example)
+params.nu_4 = 4e-6                  # hyperviscosity (example)
 params.nu_m4 = 5e-2                   # hypoviscosity (example)
 
-params.output.sub_directory="/home/jwa-user/practice_pytorch/Barotropic/output"
-params.output.periods_save.phys_fields = 2.0
+params.output.sub_directory=os.path.join(os.getcwd(),"output")
+params.output.periods_save.phys_fields = dt_out
+params.output.periods_print["print_stdout"]=10*dt_out
 
 params.init_fields.type="from_file"
-params.init_fields.from_file.path="/home/jwa-user/practice_pytorch/Barotropic/restart.nc"
+
+params.init_fields.from_file.path=init_nc
+nc=h5netcdf.File(init_nc,"r")
+init_time = nc["state_phys"].attrs["time"]
+
+params.time_stepping.t_end = init_time + lead_time
+params.time_stepping.USE_T_END = False
+params.time_stepping.it_end = round((init_time+lead_time)/dt0)
 
 sim = Simul(params)
 op = sim.oper
 
 # --- open a NetCDF file to load the forcing ---
-path_nc = "/home/jwa-user/practice_pytorch/Barotropic/forcing_test.nc"
-nc = Dataset(path_nc, "r")
+path_nc=os.path.join(os.getcwd(),"forcings","forcing.nc")
+nc = h5netcdf.File(path_nc, "r")
 
-forcing_rot_r=nc["rot_fft_forcing_r"]
-forcing_rot_i=nc["rot_fft_forcing_i"]
+forcing_rot_r=nc["rot_fft_forcing_r"][:]
+forcing_rot_i=nc["rot_fft_forcing_i"][:]
 dt_forcing=nc["time"][1]-nc["time"][0]
-print(nc["time"][0:6])
-if dt_forcing != params.time_stepping.deltat0 :
-    print("oh no is time step mismatch",dt_forcing,params.time_stepping.deltat0)
-    quit()
+nt_forcing=len(nc["time"])
+time_intv_forcing=round(dt_forcing/params.time_stepping.deltat0)
+
 # -----------------------
 # 3) hook the forcing time series into 'in_script'
 # -----------------------
 def compute_forcing_fft_each_time(self):
-    t = self.sim.time_stepping.t
-    # nearest-neighbor in time (or do linear interpolation; see B below)
-    n = int(round(t/params.time_stepping.deltat0))-1
-    rot_fft_forcing=forcing_rot_r[n]+1j*forcing_rot_i[n]
-    return {"rot_fft": rot_fft_forcing}
+
+    it=self.sim.time_stepping.it
+    it_forcing=min(int(it/time_intv_forcing),nt_forcing-2)
+    factor= float(it%time_intv_forcing)/float(time_intv_forcing)
+ 
+    rot_fft_forcing_prev=forcing_rot_r[it_forcing]+1j*forcing_rot_i[it_forcing]
+    rot_fft_forcing_next=forcing_rot_r[it_forcing+1]+1j*forcing_rot_i[it_forcing+1]
+
+    rot_fft_forcing=(1.0-factor) * rot_fft_forcing_prev + factor * rot_fft_forcing_next
+
+    return {"rot_fft": rot_fft_forcing.astype(np.complex128)}
 
 sim.forcing.forcing_maker.monkeypatch_compute_forcing_fft_each_time(
     compute_forcing_fft_each_time
 )
 
-
 sim.time_stepping.start()
+nc.close()
+

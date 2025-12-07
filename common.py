@@ -1,37 +1,8 @@
 import os 
 import numpy as np
-from netCDF4 import Dataset
 from fluidsim.solvers.ns2d.solver import Simul
 from fluidsim.base.output.base import SpecificOutput
 import matplotlib
-
-
-class ForcingData :
-    def __init__(self,path_nc):
-        nc = Dataset(path_nc, "r")
-        self.frot_r=nc["rot_fft_forcing_r"]
-        self.frot_i=nc["rot_fft_forcing_i"]
-        self.dt_forcing=nc["time"][1]-nc["time"][0]
-        self.nt_forcing=len(nc["time"])
-# -----------------------
-# 3) hook the forcing time series into 'in_script'
-# -----------------------
-    def compute_forcing_fft_each_time():
-
-        time_intv_forcing=round(self.dt_forcing/self.sim.time_stepping.deltat)
-        it=self.sim.time_stepping.it
-        it_forcing=min(int(it/time_intv_forcing),nt_forcing-2)
-        factor= float(it%time_intv_forcing)/float(time_intv_forcing)
-
-        ffrot_prev=self.frot_r[it_forcing]+1j*self.frot_i[it_forcing]
-        ffrot_next=self.frot_r[it_forcing+1]+1j*self.frot_i[it_forcing+1]
-
-        ffrot=  (1.0-factor) * ffrot_prev + factor * ffrot_next
-
-        return {"rot_fft": ffrot}
-
-
-
 
 def _has_to_online_save_every_n_steps(self):
     """Return True every N iterations instead of using time buckets.

@@ -2,24 +2,19 @@ import os
 import sys
 import glob
 import numpy as np
-import netCDF4
+import h5netcdf
 
 
-dir_high = "output/NS2D_256x256_S2pix2pi_2025-11-12_15-11-20"
-dir_low ="dummy_low_init"
+dir_high = "nature/control"
+dir_low ="nature/x4"
  
 paths=glob.glob(dir_high + "/state_phys_*.nc")
 
 for path in paths :
     f=os.path.basename(path)
-    nc = netCDF4.Dataset(dir_high + "/" + f, 'r')
-    nc_low = netCDF4.Dataset(dir_low + "/" + f,'r+')
+    nc = h5netcdf.File(dir_high + "/" + f, 'r')
+    nc_low = h5netcdf.File(dir_low + "/" + f,'r+')
 
-#  print(nc)
-#  print(nc.groups['state_phys'])
-#for var in nc.variables[:]:
-#    print(var)
-#  quit()
     ux = np.array(nc.groups['state_phys'].variables['ux'][:])
     uy = np.array(nc.groups['state_phys'].variables['uy'][:])
     vor = np.array(nc.groups['state_phys'].variables['rot'][:])
@@ -28,9 +23,6 @@ for path in paths :
 
     nx_low = np.array(nc_low.groups['state_phys'].dimensions['x'].size)
     ny_low = np.array(nc_low.groups['state_phys'].dimensions['y'].size)
-
- #   print(nc_low.groups['state_phys'].variables['rot'])
- #   quit()
 
     nmx=int(nx/nx_low)
     nmy=int(ny/ny_low)
@@ -53,11 +45,8 @@ for path in paths :
     nc_low.groups['state_phys'].variables['uy'][:] = uy_low
     nc_low.groups['state_phys'].variables['rot'][:] = vor_low
 
-#print(np.max(ux),np.min(ux))
-#print(np.max(ux_low),np.min(ux_low))
-    print(np.max(vor),np.min(vor))
-    print("low aft",np.max(vor_low),np.min(vor_low))
-#quit()
-    nc.close
-    nc_low.close
+#    print("vor high max min",np.max(vor),np.min(vor))
+#    print("vor low  max min",np.max(vor_low),np.min(vor_low))
+    nc.close()
+    nc_low.close()
 

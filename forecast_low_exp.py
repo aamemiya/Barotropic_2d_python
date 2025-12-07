@@ -7,12 +7,17 @@ from fluidsim.base.output.base import SpecificOutput
 import common
 
 init_nc=sys.argv[1]
+outdir="/data/Barotropic/output/forecast_x4"
 
 nx=32
 dt0=0.004
 dt_out=0.4
 intv_out=int(round(dt_out/dt0))
 lead_time=10
+
+tstamp=init_nc.split("/")[-1].replace("state_phys_t","").replace(".nc","")
+outdir=os.path.abspath(os.path.expanduser(outdir))
+rundir=os.path.join(outdir,tstamp)
 
 # Keep a reference to the original method
 _orig_has_to_online_save = SpecificOutput._has_to_online_save
@@ -32,9 +37,10 @@ params.forcing.key_forced = "rot_fft"    # force vorticity (standard in ns2d)
 params.nu_4 =  1e-3                  # hyperviscosity (example)
 params.nu_m4 = 5e-2                   # hypoviscosity (example)
 
-params.output.sub_directory=os.path.join(os.getcwd(),"output")
+params.output.sub_directory=outdir
 params.output.periods_save.phys_fields = dt_out
-params.output.periods_print["print_stdout"]=10*dt_out
+#params.output.periods_print["print_stdout"]=10*dt_out
+params.output.periods_print["print_stdout"]=1000000*dt_out
 
 params.init_fields.type="from_file"
 
@@ -48,6 +54,9 @@ params.time_stepping.it_end = round((init_time+lead_time)/dt0)
 
 sim = Simul(params)
 op = sim.oper
+
+os.rename(sim.output.path_run, rundir)
+sim.output.path_run = rundir
 
 # --- open a NetCDF file to load the forcing ---
 path_nc=os.path.join(os.getcwd(),"forcings","forcing_x4.nc")
@@ -81,4 +90,8 @@ sim.forcing.forcing_maker.monkeypatch_compute_forcing_fft_each_time(
 
 sim.time_stepping.start()
 nc.close()
+
+lock = os.path.join(rundir, "is_being_advanced.lock")
+if os.path.exists(lock):
+    os.remove(lock)
 
